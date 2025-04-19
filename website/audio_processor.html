@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>宝子哥AI音频智剪</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <header>
+        <h1>宝子哥AI音频智剪</h1>
+    </header>
+    
+    <div class="container">
+        <div class="main-content">
+            <div class="sidebar">
+                <div class="card">
+                    <div class="card-header">
+                        本地算力连接
+                        <div id="connection-status" class="status status-disconnected">
+                            未连接到本地算力服务
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <div class="form-group">
+                            <label for="server-url">服务地址</label>
+                            <div class="folder-picker">
+                                <input type="text" id="server-url" placeholder="例如: localhost:9000">
+                                <button id="connect-btn" onclick="connectToService()">连接</button>
+                                <button id="disconnect-btn" onclick="disconnectService()" class="hidden">断开</button>
+                            </div>
+                        </div>
+                        
+                        <div class="recent-urls hidden" id="recent-urls">
+                            <p>最近使用的服务:</p>
+                            <div class="url-buttons" id="url-buttons">
+                                <!-- 最近的URL将在这里显示 -->
+                            </div>
+                        </div>
+                        
+                        <div id="gpu-info" class="gpu-info hidden">
+                            <!-- GPU信息将在这里显示 -->
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="card">
+                    <div class="card-header">处理参数</div>
+                    <div class="card-body">
+                        <div class="form-group">
+                            <label for="model-select">AI模型</label>
+                            <select id="model-select">
+                                <option value="tiny">一档：显存1G 文字识别很低 速度快 </option>
+                                <option value="base" =>二档：显存2G 文字识别低 速度稍快</option>
+                                <option value="small">三档档：显存4G 文字识别中等 速度慢</option>
+                                <option value="medium">四档：显存6G 文字识别高 速度很慢 </option>
+                                <option value="large">五档：显存8G 文字识别很高 速度非常慢</option>
+                            </select>
+                        </div>
+                        
+                        <div id="time-settings">
+                            <div class="form-group">
+                                <label for="min-interval">最小分段间隔 (秒)</label>
+                                <input type="number" id="min-interval" min="0.5" max="10" step="0.5" value="1.0">
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="max-interval">最大分段间隔 (秒)</label>
+                                <input type="number" id="max-interval" min="1" max="20" step="0.5" value="5.0">
+                            </div>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="keywords">关键词过滤（可选）</label>
+                            <textarea id="keywords" placeholder="输入关键词，用空格、逗号或分号分隔，用于过滤包含关键词的片段" rows="2" style="height: 60px; resize: none; width: 100%; box-sizing: border-box;"></textarea>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label>
+                                <input type="checkbox" id="preserve-sentences" checked>
+                                保持完整句子
+                            </label>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label>转写精度</label>
+                            <div class="range-with-value">
+                                <input type="range" min="1" max="10" value="7" id="transcribe-accuracy" oninput="updateRangeValue('transcribe-accuracy', 'accuracy-value')">
+                                <span id="accuracy-value">7</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="card">
+                    <div class="card-header">输出设置</div>
+                    <div class="card-body">
+                        <div class="form-group">
+                            <label>音频输出格式</label>
+                            <select id="audio-format">
+                                <option value="mp3" selected>MP3</option>
+                                <option value="wav">WAV</option>
+                                <option value="ogg">OGG</option>
+                                <option value="flac">FLAC</option>
+                            </select>
+                        </div>
+                        
+                        <div class="form-group hidden">
+                            <input type="hidden" id="chinese-convert" value="simplified">
+                        </div>
+                        
+                        <div class="form-group hidden">
+                            <input type="hidden" id="include-timestamps" value="true" checked>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="content">
+                <div class="tabs">
+                    <div class="tab active" data-tab="upload">上传处理</div>
+                    <div class="tab" data-tab="batch">批量处理</div>
+                    <div class="tab" data-tab="results">处理结果</div>
+                    <div class="tab" data-tab="edit">结果编辑</div>
+                    <div class="tab" data-tab="history">历史记录</div>
+                </div>
+                
+                <div class="tab-content active" id="upload-tab">
+                    <div class="card">
+                        <div class="card-header">选择音频文件</div>
+                        <div class="card-body">
+                            <div class="form-group">
+                                <label for="audio-file">选择要处理的音频文件</label>
+                                <input type="file" id="audio-file" accept="audio/*,video/*" onchange="handleFileSelect()">
+                            </div>
+                            
+                            <p id="file-info" class="hidden"></p>
+                            
+                            <div class="form-group">
+                                <label for="output-folder">输出文件夹路径</label>
+                                <div class="folder-picker">
+                                    <input type="text" id="output-folder" placeholder="选择输出文件夹" readonly>
+                                    <button onclick="selectOutputFolder()">浏览...</button>
+                                    <button onclick="setOutputFolder()">设置默认</button>
+                                </div>
+                                <p class="hint">点击"浏览..."按钮选择文件夹，或者点击"设置默认"应用默认位置</p>
+                            </div>
+                            
+                            <button id="process-btn" onclick="startProcessing()" disabled>开始处理</button>
+                        </div>
+                    </div>
+                    
+                    <div class="card hidden" id="processing-card">
+                        <div class="card-header">处理进度</div>
+                        <div class="card-body">
+                            <p id="processing-status">准备处理...</p>
+                            <div class="progress-container">
+                                <div class="progress-bar" id="progress-bar"></div>
+                            </div>
+                            <p id="progress-text">0%</p>
+                            <p id="detailed-status">等待处理...</p>
+                            
+                            <div class="process-controls">
+                                <button id="cancel-btn" onclick="cancelProcessing()" class="btn-danger">取消</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="tab-content" id="batch-tab">
+                    <div class="card">
+                        <div class="card-header">批量处理文件</div>
+                        <div class="card-body">
+                            <div class="form-group">
+                                <label for="batch-files">选择多个音频文件</label>
+                                <input type="file" id="batch-files" accept="audio/*,video/*" multiple onchange="handleBatchFileSelect()">
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="batch-folder">或者选择包含音频的文件夹</label>
+                                <div class="folder-picker">
+                                    <input type="text" id="batch-folder" placeholder="选择文件夹" readonly>
+                                    <button onclick="selectBatchFolder()">选择...</button>
+                                </div>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="batch-output-folder">批量输出文件夹路径</label>
+                                <div class="folder-picker">
+                                    <input type="text" id="batch-output-folder" placeholder="选择批量输出文件夹" readonly>
+                                    <button onclick="selectBatchOutputFolder()">浏览...</button>
+                                    <button onclick="setBatchOutputFolder()">设置默认</button>
+                                </div>
+                                <p class="hint">点击"浏览..."按钮选择文件夹，或者点击"设置默认"应用默认位置</p>
+                            </div>
+                            
+                            <div id="batch-files-list" class="batch-list">
+                                <div class="empty-list-message">尚未选择文件</div>
+                            </div>
+                            
+                            <div class="batch-controls">
+                                <button id="clear-batch-btn" onclick="clearBatchFiles()" disabled>清空列表</button>
+                                <button id="batch-process-btn" onclick="startBatchProcessing()" disabled>开始批量处理</button>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="card hidden" id="batch-progress-card">
+                        <div class="card-header">批量处理进度</div>
+                        <div class="card-body">
+                            <p id="batch-status">准备处理...</p>
+                            
+                            <div class="form-group">
+                                <label>总进度 (<span id="processed-count">0</span>/<span id="total-count">0</span>)</label>
+                                <div class="progress-container">
+                                    <div class="progress-bar" id="batch-total-progress-bar"></div>
+                                </div>
+                                <p id="batch-progress-text">0%</p>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label id="current-file-name">当前文件: 无</label>
+                                <div class="progress-container">
+                                    <div class="progress-bar" id="current-file-progress-bar"></div>
+                                </div>
+                            </div>
+                            
+                            <div class="batch-controls">
+                                <button id="batch-pause-btn" onclick="pauseBatchProcessing()">暂停</button>
+                                <button id="batch-resume-btn" onclick="resumeBatchProcessing()" class="hidden">继续</button>
+                                <button onclick="cancelBatchProcessing()" class="btn-danger">取消</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="tab-content" id="results-tab">
+                    <div id="no-results" class="empty-state">
+                        <p>暂无处理结果</p>
+                        <p>请先处理一个音频文件</p>
+                    </div>
+                    
+                    <div id="results-content" class="hidden">
+                        <!-- 结果内容将在这里显示 -->
+                    </div>
+                </div>
+                
+                <div class="tab-content" id="edit-tab">
+                    <div id="no-edit-content" class="empty-state">
+                        <p>没有可编辑的内容</p>
+                        <p>请先处理一个音频文件</p>
+                    </div>
+                    
+                    <div id="edit-content" class="hidden">
+                        <div class="edit-segment-list" id="edit-segment-list">
+                            <!-- 可编辑的分段列表将在这里显示 -->
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="tab-content" id="history-tab">
+                    <div class="card">
+                        <div class="card-header">处理历史</div>
+                        <div class="card-body">
+                            <div id="history-list" class="history-list">
+                                <div class="empty-state">
+                                    <p>历史记录暂时为空</p>
+                                    <p>您处理的音频将记录在这里</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div id="modal-overlay" class="modal-overlay hidden">
+        <div id="modal" class="modal">
+            <div class="modal-header">
+                <h3 id="modal-title">标题</h3>
+                <button id="modal-close" class="modal-close" onclick="closeModal()">&times;</button>
+            </div>
+            <div id="modal-content" class="modal-content">
+                <!-- 动态内容 -->
+            </div>
+            <div id="modal-footer" class="modal-footer">
+                <button id="modal-cancel" onclick="closeModal()">取消</button>
+                <button id="modal-confirm" onclick="confirmModal()">确定</button>
+            </div>
+        </div>
+    </div>
+    
+    <script src="script.js"></script>
+</body>
+</html>
